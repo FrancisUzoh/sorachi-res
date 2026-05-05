@@ -33,7 +33,7 @@ const WordPressMenu: React.FC = () => {
       let wpItems: MenuItemNode[] = [];
       let firestoreItems: MenuItemNode[] = [];
 
-      // 1. Fetch WordPress with timeout
+      // 1. Fetch WordPress with timeout and fallback
       const wpQuery = `
         query GetMenuItems {
           dishes {
@@ -50,9 +50,21 @@ const WordPressMenu: React.FC = () => {
         }
       `;
 
+      const wpFallbackQuery = `
+        query GetPosts {
+          posts(first: 20) {
+            nodes {
+              id
+              title
+              excerpt
+            }
+          }
+        }
+      `;
+
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
         
         const response = await fetch('/api/wordpress-proxy', {
           method: 'POST',
@@ -66,6 +78,23 @@ const WordPressMenu: React.FC = () => {
           const json = await response.json();
           if (json.data?.dishes?.nodes) {
             wpItems = json.data.dishes.nodes;
+            if (json._isMock) {
+              console.info('Menu is using fallback mock data. WordPress site unreachable or misconfigured.');
+            }
+          } else if (json.data?.posts?.nodes) {
+            // If dishes failed but posts exist, maybe the user used posts for menu items
+            wpItems = json.data.posts.nodes.map((post: any) => ({
+              id: post.id,
+              title: post.title,
+              menuItemDetails: {
+                price: '0',
+                description: post.excerpt?.replace(/<[^>]*>?/gm, '').substring(0, 100) || '',
+                category: 'Seasonal'
+              }
+            }));
+          } else if (!json.data && json._isMock) {
+             // Fully mock data
+             wpItems = json.data?.dishes?.nodes || [];
           }
         }
       } catch (err) {
