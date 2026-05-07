@@ -1,8 +1,0 @@
-{
-  "name": "Sora Sushi - Contemporary Japanese Dining",
-  "description": "A high-end, modern Japanese restaurant website featuring seasonal omakase, elegant interiors, and seamless reservation management.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone"
-  ]
-}
