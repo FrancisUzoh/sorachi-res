@@ -1,0 +1,111 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "User Profile",
+      "description": "Public and private information about a user.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "email"]
+    },
+    "booking": {
+      "title": "Booking",
+      "description": "A restaurant reservation.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "bookingDate": { "type": "string", "format": "date-time" },
+        "guests": { "type": "integer" },
+        "selectedMenu": { "type": "string" },
+        "depositAmount": { "type": "integer" },
+        "depositPaid": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "name", "email", "bookingDate", "guests", "selectedMenu"]
+    },
+    "notification": {
+      "title": "Notification",
+      "description": "In-app notifications for users.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "success", "warning", "error"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "message", "type", "read"]
+    },
+    "menuItem": {
+      "title": "Menu Item",
+      "description": "An item on the restaurant menu.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "integer" },
+        "category": { "type": "string", "enum": ["Starters", "Nigiri", "Maki", "Signature Rolls", "Drinks", "Desserts"] },
+        "isAvailable": { "type": "boolean" },
+        "imageUrl": { "type": "string" },
+        "order": { "type": "integer" }
+      },
+      "required": ["name", "price", "category", "isAvailable"]
+    },
+    "blockout": {
+      "title": "Date Blockout",
+      "description": "A date when reservations are closed.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "reason": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["date"]
+    },
+    "restaurantSettings": {
+      "title": "Restaurant Settings",
+      "description": "Global settings for the restaurant.",
+      "type": "object",
+      "properties": {
+        "maxGuestsPerSlot": { "type": "integer" },
+        "autoConfirm": { "type": "boolean" },
+        "notice": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "userProfile",
+      "description": "User profile data."
+    },
+    "/bookings/{bookingId}": {
+      "schema": "booking",
+      "description": "Reservation records."
+    },
+    "/notifications/{notificationId}": {
+      "schema": "notification",
+      "description": "User notifications."
+    },
+    "/menuItems/{itemId}": {
+      "schema": "menuItem",
+      "description": "The restaurant menu items."
+    },
+    "/blockouts/{blockoutId}": {
+      "schema": "blockout",
+      "description": "Blocked dates for reservations."
+    },
+    "/settings/global": {
+      "schema": "restaurantSettings",
+      "description": "Global settings."
+    }
+  }
+}

@@ -1,0 +1,142 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      // In production, you might want to require: request.auth.token.email_verified == true
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'francasayo@gmail.com'
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Helpers ---
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['fullName', 'email']) &&
+             data.keys().size() <= 6 &&
+             data.fullName is string && data.fullName.size() <= 100 &&
+             data.email is string && data.email.size() <= 100;
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll(['clientId', 'name', 'email', 'bookingDate', 'guests', 'selectedMenu', 'depositAmount', 'depositPaid', 'status', 'createdAt']) &&
+             data.keys().size() <= 13 &&
+             data.clientId == request.auth.uid &&
+             data.name is string && data.name.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.phone is string && data.phone.size() <= 20 &&
+             (data.get('requests', '') is string && data.get('requests', '').size() <= 2000) &&
+             data.guests is int && data.guests > 0 && data.guests <= 20 &&
+             data.status in ['pending', 'confirmed', 'cancelled'] &&
+             data.depositPaid is bool &&
+             data.createdAt == request.time;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['userId', 'title', 'message', 'type', 'read', 'createdAt']) &&
+             data.keys().size() <= 6 &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 100 &&
+             data.message is string && data.message.size() <= 1000 &&
+             data.type in ['info', 'success', 'warning', 'error'] &&
+             data.read is bool &&
+             data.createdAt == request.time;
+    }
+
+    function isValidMenuItem(data) {
+      return data.keys().hasAll(['name', 'price', 'category', 'isAvailable']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.price is int &&
+             data.category in ["Starters", "Nigiri", "Maki", "Signature Rolls", "Drinks", "Desserts"] &&
+             data.isAvailable is bool;
+    }
+
+    function isValidBlockout(data) {
+      return data.keys().hasAll(['date']) &&
+             data.date is string &&
+             data.createdAt == request.time;
+    }
+
+    // --- Rules ---
+
+    match /test/connection {
+      allow read: if true;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUserProfile(incoming()) && incoming().createdAt == request.time;
+      allow update: if isOwner(userId) && isValidUserProfile(incoming()) &&
+                   incoming().createdAt == existing().createdAt &&
+                   incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'phone', 'email']);
+    }
+
+    match /bookings/{bookingId} {
+      allow get: if isSignedIn() && (existing().clientId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.clientId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(bookingId) && isValidBooking(incoming()) && incoming().status == 'pending';
+      allow update: if isSignedIn() && isValidId(bookingId) && (
+        isAdmin() ||
+        (existing().clientId == request.auth.uid && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['status']) && 
+         incoming().status == 'cancelled' &&
+         existing().status == 'pending')
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(notificationId) && isValidNotification(incoming());
+      allow update: if isSignedIn() && isValidId(notificationId) && isOwner(existing().userId) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    match /menuItems/{itemId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /blockouts/{blockoutId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidBlockout(incoming());
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if false; // System set only
+    }
+  }
+}
